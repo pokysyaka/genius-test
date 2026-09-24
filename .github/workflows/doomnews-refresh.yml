@@ -1,0 +1,37 @@
+name: DOOM NEWS refresh
+
+on:
+  schedule:
+    # Avoid the top of the hour, when scheduled runs are more often delayed.
+    - cron: '2-57/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: doomnews-refresh
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Refresh feeds and queued stories
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(curl --fail --silent --show-error --location \
+            --max-time 55 --retry 1 --retry-delay 3 \
+            'https://doomnews.net/api/news-refresh?wait=1')"
+          python3 -c '
+          import json, sys
+          result = json.loads(sys.stdin.read())
+          failures = [str(item.get("source", "unknown")) + ": " + str(item["error"])
+                      for item in result.get("results", []) if item.get("error")]
+          if not result.get("ok") or failures:
+              raise SystemExit("News refresh failed: " + ", ".join(failures))
+          print("Refresh completed:", result.get("phase"),
+                "processed sources:", len(result.get("results", [])))
+          ' <<< "$response"
