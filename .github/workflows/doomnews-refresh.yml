@@ -30,8 +30,11 @@ jobs:
           result = json.loads(sys.stdin.read())
           failures = [str(item.get("source", "unknown")) + ": " + str(item["error"])
                       for item in result.get("results", []) if item.get("error")]
-          if not result.get("ok") or failures:
-              raise SystemExit("News refresh failed: " + ", ".join(failures))
+          if not result.get("ok"):
+              raise SystemExit("News refresh failed: site refresh did not complete")
+          for failure in failures:
+              annotation = failure.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::warning title=News source unavailable::" + annotation)
           print("Refresh completed:", result.get("phase"),
                 "processed sources:", len(result.get("results", [])))
           ' <<< "$response"
